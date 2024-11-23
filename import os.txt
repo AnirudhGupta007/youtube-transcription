@@ -1,0 +1,54 @@
+import os
+from googleapiclient.discovery import build
+from youtube_transcript_api import YouTubeTranscriptApi
+import openai
+import streamlit as st
+
+YOUTUBE_API_KEY = 'AIzaSyBPVOZSHEkyZn-8kqy9D_X6E4Bl6X0awpY'
+OPENAI_API_KEY = 'sk-proj-T1Z96t6OwgDRoD8VDYPsT3BlbkFJvlLHG9h5B3porwERfof'
+
+youtube = build('youtube', 'v3', developerKey=YOUTUBE_API_KEY)
+
+def search_youtube(query):
+    request = youtube.search().list(
+        q=query,
+        part='snippet',
+        type='video',
+        maxResults=20
+    )
+    response = request.execute()
+    return response['items']
+
+def get_transcripts(video_ids):
+    transcripts = []
+    for video_id in video_ids:
+        try:
+            transcript = YouTubeTranscriptApi.get_transcript(video_id)
+            transcripts.append(' '.join([item['text'] for item in transcript]))
+        except:
+            transcripts.append("Transcript not available")
+    return transcripts
+
+def summarize_text(text):
+    openai.api_key = OPENAI_API_KEY
+    response = openai.Completion.create(
+        engine="davinci-codex",
+        prompt=f"Summarize the following text:\n\n{text}",
+        max_tokens=150
+    )
+    return response.choices[0].text.strip()
+
+
+st.title("YouTube Video Transcription and Summarization")
+
+query = st.text_input("Enter search term:")
+if query:
+    videos = search_youtube(query)
+    video_ids = [video['id']['videoId'] for video in videos]
+    transcripts = get_transcripts(video_ids)
+    summaries = [summarize_text(transcript) for transcript in transcripts]
+
+    for i, video in enumerate(videos):
+        st.subheader(video['snippet']['title'])
+        st.text(f"Summary: {summaries[i]}")
+        st.video(f"https://www.youtube.com/watch?v={video_ids[i]}")
